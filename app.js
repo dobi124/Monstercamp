@@ -1,3 +1,7 @@
+// ========================================
+// IMPORTS
+// ========================================
+
 import {
   createBoard,
   findMatches,
@@ -11,22 +15,36 @@ import {
   ENEMY
 } from "./monsters.js";
 
+
+// ========================================
+// CONSTANTS
+// ========================================
+
 const SIZE = 6;
 const DRAG_TIME_MS = 5000;
 
 let board = createBoard(SIZE);
+
 let dragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
 let dragX = 0;
 let dragY = 0;
+
+let touchStartX = 0;
+let touchStartY = 0;
+
 let dragTimer = null;
 let isProcessing = false;
 let comboCount = 0;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/* ==========================
-    РЕНДЕР МОНСТРОВ
-========================== */
+
+// ========================================
+// RENDER MONSTERS
+// ========================================
+
 function loadMonsters() {
   document.getElementById("enemy-img").src = ENEMY.img;
   updateEnemyHp();
@@ -42,17 +60,16 @@ function loadMonsters() {
     img.className = "ally-img";
     img.src = m.img;
 
-    const bar = document.createElement("div");
-    bar.className = "ally-hp-bar";
+    const hpBar = document.createElement("div");
+    hpBar.className = "ally-hp-bar";
 
     const fill = document.createElement("div");
     fill.className = "ally-hp-fill";
     fill.style.width = (m.hp / m.maxHp) * 100 + "%";
 
-    bar.appendChild(fill);
+    hpBar.appendChild(fill);
     box.appendChild(img);
-    box.appendChild(bar);
-
+    box.appendChild(hpBar);
     zone.appendChild(box);
   });
 }
@@ -62,17 +79,17 @@ function updateEnemyHp() {
     (ENEMY.hp / ENEMY.maxHp) * 100 + "%";
 }
 
-/* ==========================
-    MATCH-3 ОТРИСОВКА
-========================== */
+
+// ========================================
+// RENDER BOARD
+// ========================================
+
 function renderBoard() {
   const boardEl = document.getElementById("board");
   boardEl.innerHTML = "";
 
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
-      const d = board[y][x];
-
       const t = document.createElement("div");
       t.className = "tile";
       t.dataset.x = x;
@@ -81,20 +98,35 @@ function renderBoard() {
 
       const img = document.createElement("img");
       img.className = "tile-img";
-      img.src = d.img;
+      img.src = board[y][x].img;
       t.appendChild(img);
 
-      t.addEventListener("mousedown", () => startDrag(x, y));
-      t.addEventListener("touchstart", (e) => { e.preventDefault(); startDrag(x, y); }, { passive: false });
+      // MOUSE START
+      t.addEventListener("mousedown", (e) =>
+        startDrag(x, y, e.clientX, e.clientY)
+      );
+
+      // TOUCH START
+      t.addEventListener(
+        "touchstart",
+        (e) => {
+          e.preventDefault();
+          const t = e.touches[0];
+          startDrag(x, y, t.clientX, t.clientY);
+        },
+        { passive: false }
+      );
 
       boardEl.appendChild(t);
     }
   }
 }
 
-/* ==========================
-      ТАЙМЕР ХОДА
-========================== */
+
+// ========================================
+// TURN TIMER
+// ========================================
+
 function showTurnTimer() {
   const bar = document.getElementById("turn-timer");
   const fill = document.getElementById("turn-timer-fill");
@@ -115,14 +147,23 @@ function hideTurnTimer() {
   document.getElementById("turn-timer").style.opacity = "0";
 }
 
-/* ==========================
-     DRAG & DROP
-========================== */
-function startDrag(x, y) {
+
+// ========================================
+// 🔥 DRAG & MOVE ACROSS FULL BOARD
+// ========================================
+
+function startDrag(x, y, cx, cy) {
   if (isProcessing) return;
+
   dragging = true;
+
+  dragStartX = x;
+  dragStartY = y;
   dragX = x;
   dragY = y;
+
+  touchStartX = cx;
+  touchStartY = cy;
 
   showTurnTimer();
   dragTimer = setTimeout(forceEndDrag, DRAG_TIME_MS);
@@ -137,12 +178,14 @@ function dragMove(cx, cy) {
 
   const nx = Math.floor((cx - rect.left) / cell);
   const ny = Math.floor((cy - rect.top) / cell);
-  if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) return;
-  if (nx === dragX && ny === dragY) return;
 
-  const temp = board[ny][nx];
-  board[ny][nx] = board[dragY][dragX];
-  board[dragY][dragX] = temp;
+  if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) return;
+  if (nx === dragX && ny === dragY) return; // still same tile
+
+  // Swap with new tile along the path
+  const tmp = board[dragY][dragX];
+  board[dragY][dragX] = board[ny][nx];
+  board[ny][nx] = tmp;
 
   dragX = nx;
   dragY = ny;
@@ -166,19 +209,27 @@ function forceEndDrag() {
   runMatchCycle();
 }
 
+
+// MOUSE EVENTS
 document.addEventListener("mousemove", (e) => dragMove(e.clientX, e.clientY));
 document.addEventListener("mouseup", endDrag);
 
-document.addEventListener("touchmove", (e) => {
-  const t = e.touches[0];
-  dragMove(t.clientX, t.clientY);
-}, { passive: false });
-
+// TOUCH EVENTS
+document.addEventListener(
+  "touchmove",
+  (e) => {
+    const t = e.touches[0];
+    dragMove(t.clientX, t.clientY);
+  },
+  { passive: false }
+);
 document.addEventListener("touchend", endDrag);
 
-/* ==========================
-   КОМБО & ЧАСТИЦЫ
-========================== */
+
+// ========================================
+// COMBO & PARTICLES
+// ========================================
+
 function showCombo(count) {
   if (count < 2) return;
 
@@ -192,31 +243,30 @@ function showCombo(count) {
   setTimeout(() => {
     el.style.opacity = "0";
     el.style.transform = "scale(0.5)";
-  }, 700);
+  }, 600);
 }
 
 function spawnParticles() {
-  const container = document.getElementById("combo-particles");
+  const box = document.getElementById("combo-particles");
 
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < 12; i++) {
     const p = document.createElement("div");
-    p.className = "combo-particle";
+    p.style.position = "absolute";
     p.style.width = "10px";
     p.style.height = "10px";
-    p.style.borderRadius = "50%";
     p.style.background = "#ff5500";
-    p.style.position = "absolute";
+    p.style.borderRadius = "50%";
 
     const angle = Math.random() * Math.PI * 2;
-    const dist = 30 + Math.random() * 30;
+    const dist = 20 + Math.random() * 25;
     const x = Math.cos(angle) * dist;
     const y = Math.sin(angle) * dist;
 
-    container.appendChild(p);
+    box.appendChild(p);
 
     setTimeout(() => {
-      p.style.transition = "transform 0.5s ease-out, opacity 0.5s";
-      p.style.transform = `translate(${x}px, ${y}px) scale(0.3)`;
+      p.style.transition = "transform .5s, opacity .5s";
+      p.style.transform = `translate(${x}px, ${y}px) scale(0.1)`;
       p.style.opacity = "0";
     }, 10);
 
@@ -224,9 +274,11 @@ function spawnParticles() {
   }
 }
 
-/* ==========================
-     MATCH-3 ЦИКЛ
-========================== */
+
+// ========================================
+// MATCH-3 SEQUENCE
+// ========================================
+
 async function runMatchCycle() {
   if (isProcessing) return;
   isProcessing = true;
@@ -234,6 +286,7 @@ async function runMatchCycle() {
 
   while (true) {
     const matches = findMatches(board);
+
     if (matches.length === 0) break;
 
     comboCount++;
@@ -242,19 +295,23 @@ async function runMatchCycle() {
     const sorted = [...matches].sort((a, b) => a.y - b.y);
 
     sorted.forEach((m) => {
-      const el = document.querySelector(`.tile[data-x="${m.x}"][data-y="${m.y}"]`);
-      if (el) el.style.filter = "brightness(1.6)";
+      const el = document.querySelector(
+        `.tile[data-x="${m.x}"][data-y="${m.y}"]`
+      );
+      if (el) el.style.filter = "brightness(1.4)";
     });
 
     await sleep(120);
 
     for (let m of sorted) {
-      const el = document.querySelector(`.tile[data-x="${m.x}"][data-y="${m.y}"]`);
+      const el = document.querySelector(
+        `.tile[data-x="${m.x}"][data-y="${m.y}"]`
+      );
       if (el) {
         el.style.opacity = "0";
-        el.style.transform += " scale(0.5)";
+        el.style.transform += " scale(0.6)";
       }
-      await sleep(90);
+      await sleep(70);
     }
 
     removeMatches(board, sorted);
@@ -262,15 +319,17 @@ async function runMatchCycle() {
     refill(board);
 
     renderBoard();
-    await sleep(160);
+    await sleep(150);
   }
 
   isProcessing = false;
 }
 
-/* ==========================
-        INIT
-========================== */
+
+// ========================================
+// INIT
+// ========================================
+
 document.addEventListener("DOMContentLoaded", () => {
   loadMonsters();
   renderBoard();

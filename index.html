@@ -1,14 +1,187 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Моя TG игра</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  </head>
-  <body style="margin:0; font-family: system-ui, sans-serif;">
-    <div id="app"></div>
+<head>
+  <meta charset="UTF-8" />
+  <title>MonsterCamp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <script type="module" src="./app.js"></script>
-  </body>
+  <style>
+    :root {
+      --board-size: min(90vw, 420px);
+      --cell: calc(var(--board-size) / 6);
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      background: #10141a;
+      height: 100%;
+      font-family: system-ui, sans-serif;
+      overflow: hidden;
+    }
+
+    #game {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+
+    h1 {
+      text-align: center;
+      color: white;
+      font-size: 24px;
+      margin-top: 8px;
+      margin-bottom: 4px;
+    }
+
+    /* ВРАГ */
+    #enemy-zone {
+      text-align: center;
+      padding-top: 4px;
+    }
+    #enemy-img {
+      width: 140px;
+    }
+    #enemy-hp-bar {
+      width: 60%;
+      height: 10px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 6px;
+      margin: 6px auto;
+      overflow: hidden;
+    }
+    #enemy-hp-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ff3333, #ff8800);
+      transition: width 0.2s;
+    }
+
+    /* МОИ МОНСТРЫ НАД MATCH-3 */
+    #team-zone {
+      display: flex;
+      justify-content: space-around;
+      align-items: flex-end;
+      height: 22vh;
+      margin-top: 4px;
+    }
+
+    .ally-slot {
+      text-align: center;
+    }
+    .ally-img {
+      width: 90px;
+    }
+    .ally-hp-bar {
+      width: 90px;
+      height: 8px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 3px;
+    }
+    .ally-hp-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #66ff66, #33cc33);
+    }
+
+    /* ТАЙМЕР */
+    #turn-timer {
+      width: 90%;
+      height: 6px;
+      margin: 6px auto;
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    #turn-timer-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #ff4444, #ffaa00);
+      transform-origin: left;
+    }
+
+    /* MATCH-3 ПОЛЕ */
+    #board {
+      width: var(--board-size);
+      height: var(--board-size);
+      margin: 0 auto 10px auto;
+      position: relative;
+    }
+
+    .tile {
+      position: absolute;
+      width: calc(var(--cell) - 8px);
+      height: calc(var(--cell) - 8px);
+      left: 4px;
+      top: 4px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #1e2430;
+      border-radius: 12px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.4);
+      transition: transform 0.18s ease, opacity 0.25s ease;
+    }
+
+    .tile-img {
+      width: calc(var(--cell) * 0.75);
+      height: calc(var(--cell) * 0.75);
+    }
+
+    /* КОМБО */
+    #combo-popup {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      font-size: 28px;
+      color: #ff4444;
+      font-weight: bold;
+      opacity: 0;
+      transform: scale(0.5);
+      transition: opacity .2s, transform .2s;
+      pointer-events: none;
+      text-shadow: 0 0 12px #ff2200;
+    }
+
+    #combo-particles {
+      position: fixed;
+      right: 40px;
+      bottom: 40px;
+      width: 1px;
+      height: 1px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="game">
+
+  <h1>MonsterCamp</h1>
+
+  <div id="enemy-zone">
+    <img id="enemy-img" />
+    <div id="enemy-hp-bar"><div id="enemy-hp-fill"></div></div>
+  </div>
+
+  <div id="team-zone"></div>
+
+  <div id="turn-timer"><div id="turn-timer-fill"></div></div>
+
+  <div id="board"></div>
+
+  <div id="combo-popup"></div>
+  <div id="combo-particles"></div>
+
+</div>
+
+<script type="module" src="./app.js"></script>
+
+</body>
 </html>

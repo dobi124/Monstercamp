@@ -26,13 +26,8 @@ const DRAG_TIME_MS = 5000;
 let board = createBoard(SIZE);
 
 let dragging = false;
-let dragStartX = 0;
-let dragStartY = 0;
 let dragX = 0;
 let dragY = 0;
-
-let touchStartX = 0;
-let touchStartY = 0;
 
 let dragTimer = null;
 let isProcessing = false;
@@ -101,21 +96,8 @@ function renderBoard() {
       img.src = board[y][x].img;
       t.appendChild(img);
 
-      // MOUSE START
-      t.addEventListener("mousedown", (e) =>
-        startDrag(x, y, e.clientX, e.clientY)
-      );
-
-      // TOUCH START
-      t.addEventListener(
-        "touchstart",
-        (e) => {
-          e.preventDefault();
-          const t = e.touches[0];
-          startDrag(x, y, t.clientX, t.clientY);
-        },
-        { passive: false }
-      );
+      // POINTER START (works on touch + mouse)
+      t.addEventListener("pointerdown", (e) => startDrag(x, y));
 
       boardEl.appendChild(t);
     }
@@ -149,43 +131,38 @@ function hideTurnTimer() {
 
 
 // ========================================
-// 🔥 DRAG & MOVE ACROSS FULL BOARD
+// DRAG ACROSS ENTIRE BOARD (BATTLE CAMP STYLE)
 // ========================================
 
-function startDrag(x, y, cx, cy) {
+function startDrag(x, y) {
   if (isProcessing) return;
 
   dragging = true;
 
-  dragStartX = x;
-  dragStartY = y;
   dragX = x;
   dragY = y;
-
-  touchStartX = cx;
-  touchStartY = cy;
 
   showTurnTimer();
   dragTimer = setTimeout(forceEndDrag, DRAG_TIME_MS);
 }
 
-function dragMove(cx, cy) {
+function pointerMove(e) {
   if (!dragging) return;
 
   const boardEl = document.getElementById("board");
   const rect = boardEl.getBoundingClientRect();
   const cell = rect.width / SIZE;
 
-  const nx = Math.floor((cx - rect.left) / cell);
-  const ny = Math.floor((cy - rect.top) / cell);
+  const nx = Math.floor((e.clientX - rect.left) / cell);
+  const ny = Math.floor((e.clientY - rect.top) / cell);
 
   if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) return;
-  if (nx === dragX && ny === dragY) return; // still same tile
+  if (nx === dragX && ny === dragY) return;
 
-  // Swap with new tile along the path
-  const tmp = board[dragY][dragX];
+  // Swap step-by-step
+  const temp = board[dragY][dragX];
   board[dragY][dragX] = board[ny][nx];
-  board[ny][nx] = tmp;
+  board[ny][nx] = temp;
 
   dragX = nx;
   dragY = ny;
@@ -193,41 +170,25 @@ function dragMove(cx, cy) {
   renderBoard();
 }
 
-function endDrag() {
+function pointerUp() {
   if (!dragging) return;
-  dragging = false;
 
+  dragging = false;
   hideTurnTimer();
   clearTimeout(dragTimer);
 
   runMatchCycle();
 }
 
-function forceEndDrag() {
-  dragging = false;
-  hideTurnTimer();
-  runMatchCycle();
-}
 
-
-// MOUSE EVENTS
-document.addEventListener("mousemove", (e) => dragMove(e.clientX, e.clientY));
-document.addEventListener("mouseup", endDrag);
-
-// TOUCH EVENTS
-document.addEventListener(
-  "touchmove",
-  (e) => {
-    const t = e.touches[0];
-    dragMove(t.clientX, t.clientY);
-  },
-  { passive: false }
-);
-document.addEventListener("touchend", endDrag);
+// GLOBAL POINTER EVENTS
+document.addEventListener("pointermove", pointerMove);
+document.addEventListener("pointerup", pointerUp);
+document.addEventListener("pointercancel", pointerUp);
 
 
 // ========================================
-// COMBO & PARTICLES
+// COMBO EFFECTS
 // ========================================
 
 function showCombo(count) {
@@ -254,8 +215,8 @@ function spawnParticles() {
     p.style.position = "absolute";
     p.style.width = "10px";
     p.style.height = "10px";
-    p.style.background = "#ff5500";
     p.style.borderRadius = "50%";
+    p.style.background = "#ff5500";
 
     const angle = Math.random() * Math.PI * 2;
     const dist = 20 + Math.random() * 25;
@@ -276,7 +237,7 @@ function spawnParticles() {
 
 
 // ========================================
-// MATCH-3 SEQUENCE
+// MATCH-3 PROCESSING
 // ========================================
 
 async function runMatchCycle() {
@@ -295,18 +256,14 @@ async function runMatchCycle() {
     const sorted = [...matches].sort((a, b) => a.y - b.y);
 
     sorted.forEach((m) => {
-      const el = document.querySelector(
-        `.tile[data-x="${m.x}"][data-y="${m.y}"]`
-      );
+      const el = document.querySelector(`.tile[data-x="${m.x}"][data-y="${m.y}"]`);
       if (el) el.style.filter = "brightness(1.4)";
     });
 
     await sleep(120);
 
     for (let m of sorted) {
-      const el = document.querySelector(
-        `.tile[data-x="${m.x}"][data-y="${m.y}"]`
-      );
+      const el = document.querySelector(`.tile[data-x="${m.x}"][data-y="${m.y}"]`);
       if (el) {
         el.style.opacity = "0";
         el.style.transform += " scale(0.6)";

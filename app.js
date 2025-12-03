@@ -10,7 +10,7 @@ import {
 } from "./match3.js";
 
 import { PLAYER_TEAM, ENEMY } from "./monsters.js";
-import { getLocations, completeQuest } from "./world.js";
+import { getLocations, completeQuest, getLocationById } from "./world.js";
 
 // ========================= SCENE STATE ===========================
 
@@ -43,6 +43,211 @@ document.getElementById("back-btn").addEventListener("click", () => {
     showWorld();
   }
 });
+
+// ========================= GLOBAL MAP DATA & LOGIC ===========================
+
+// здесь ты можешь подогнать размеры под свою карту, если нужно
+const GLOBAL_MAP = {
+  imageSize: { width: 1920, height: 1080 },
+
+  // 30 обычных чекпоинтов-событий
+  checkpoints: [
+    { id: "cp1",  x: 609,  y: 152, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp2",  x: 650,  y: 283, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp3",  x: 780, y: 209, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp4",  x: 852,  y: 152, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp5",  x: 855,  y: 338, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp6",  x: 625,y: 390, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp7",  x: 980, y: 463, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp8",  x: 996,  y: 592, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp9",  x: 1090, y: 505, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp10", x: 1170,  y: 613, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp11", x: 435.0,  y: 359.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp12", x: 625.75, y: 392.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp13", x: 1310.75,y: 430.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp14", x: 985.5,  y: 452.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp15", x: 502.5,  y: 473.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp16", x: 108.5,  y: 495.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp17", x: 1300.25,y: 670.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp18", x: 646.0,  y: 693.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp19", x: 894.0,  y: 693.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp20", x: 1099.5, y: 693.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp21", x: 223.75, y: 715.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp22", x: 502.5,  y: 742.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp23", x: 985.25, y: 786.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp24", x: 788.5,  y: 807.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp25", x: 1119.75,y: 829.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp26", x: 543.0,  y: 872.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp27", x: 315.0,  y: 889.75,icon: "assets/map/cp.png", type: "event" },
+    { id: "cp28", x: 349.25, y: 891.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp29", x: 894.0,  y: 893.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp30", x: 687.0,  y: 915.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp31", x: 1238.25,y: 936.5, icon: "assets/map/cp.png", type: "event" },
+    { id: "cp32", x: 1279.75,y: 934.5, icon: "assets/map/cp.png", type: "event" },
+  ],
+
+  // 5 эмблем-локаций, которые ведут к локациям из world.js
+  // target: id локации из WORLD.locations (world.js)
+  locations: [
+    {
+      id: "map_forest",
+      x: 466,
+      y: 852,
+      icon: "assets/map/forest.png",
+      target: "forest",
+    },
+    {
+      id: "map_volcano",
+      x: 350,
+      y: 250,
+      icon: "assets/map/volcano.png",
+      target: "volcano",
+    },
+    {
+      id: "map_ice",
+      x: 1470,
+      y: 350,
+      icon: "assets/map/ice.png",
+      target: "ice_peak",
+    },
+    {
+      id: "map_special1",
+      x: 1470,
+      y: 865,
+      icon: "assets/map/special1.png",
+      target: null, // пока заглушка
+    },
+    {
+      id: "map_special2",
+      x: 1620,
+      y: 700,
+      icon: "assets/map/special2.png",
+      target: null,
+    },
+  ],
+};
+
+let mapDrag = false;
+let mapStartX = 0;
+let mapStartY = 0;
+let mapOffsetX = 0;
+let mapOffsetY = 0;
+
+function setupMapDragging() {
+  const wrapper = document.getElementById("map-wrapper");
+  const mapInner = document.getElementById("map-inner");
+  if (!wrapper || !mapInner) return;
+
+  function getPoint(e) {
+    if (e.touches && e.touches[0]) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  function startDrag(e) {
+    mapDrag = true;
+    const p = getPoint(e);
+    mapStartX = p.x - mapOffsetX;
+    mapStartY = p.y - mapOffsetY;
+  }
+
+  function moveDrag(e) {
+    if (!mapDrag) return;
+    e.preventDefault();
+    const p = getPoint(e);
+    mapOffsetX = p.x - mapStartX;
+    mapOffsetY = p.y - mapStartY;
+
+    // Ограничиваем карту, чтобы не выходила за границы контейнера
+    const img = document.getElementById("big-map-img");
+    const mapWidth = img ? img.offsetWidth : GLOBAL_MAP.imageSize.width;
+    const mapHeight = img ? img.offsetHeight : GLOBAL_MAP.imageSize.height;
+    const wrapperWidth = wrapper.clientWidth;
+    const wrapperHeight = wrapper.clientHeight;
+
+    const minX = wrapperWidth - mapWidth;
+    const minY = wrapperHeight - mapHeight;
+
+    if (mapOffsetX > 0) mapOffsetX = 0;
+    if (mapOffsetY > 0) mapOffsetY = 0;
+    if (mapOffsetX < minX) mapOffsetX = minX;
+    if (mapOffsetY < minY) mapOffsetY = minY;
+
+    mapInner.style.left = mapOffsetX + "px";
+    mapInner.style.top = mapOffsetY + "px";
+  }
+
+  function endDrag() {
+    mapDrag = false;
+  }
+
+  wrapper.addEventListener("mousedown", startDrag);
+  wrapper.addEventListener("touchstart", startDrag, { passive: false });
+
+  wrapper.addEventListener("mousemove", moveDrag);
+  wrapper.addEventListener("touchmove", moveDrag, { passive: false });
+
+  wrapper.addEventListener("mouseup", endDrag);
+  wrapper.addEventListener("mouseleave", endDrag);
+  wrapper.addEventListener("touchend", endDrag);
+}
+
+function showGlobalMap() {
+  const layer = document.getElementById("map-points-layer");
+  const mapInner = document.getElementById("map-inner");
+  if (!layer || !mapInner) return;
+
+  layer.innerHTML = "";
+
+  // чекпоинты
+  GLOBAL_MAP.checkpoints.forEach((cp) => {
+    const el = document.createElement("div");
+    el.className = "map-point";
+    el.style.left = cp.x + "px";
+    el.style.top = cp.y + "px";
+    el.style.backgroundImage = `url('${cp.icon}')`;
+
+    el.addEventListener("click", () => {
+      // тут потом повесим разные типы событий:
+      // бой, сундук, диалог и т.п.
+      alert("Событие: " + cp.id);
+    });
+
+    layer.appendChild(el);
+  });
+
+  // эмблемы локаций
+  GLOBAL_MAP.locations.forEach((loc) => {
+    const el = document.createElement("div");
+    el.className = "map-point location";
+    el.style.left = loc.x + "px";
+    el.style.top = loc.y + "px";
+    el.style.backgroundImage = `url('${loc.icon}')`;
+
+    el.addEventListener("click", () => {
+      if (loc.target) {
+        const worldLoc = getLocationById(loc.target);
+        if (worldLoc && worldLoc.unlocked) {
+          showLocation(worldLoc);
+        } else if (worldLoc && !worldLoc.unlocked) {
+          alert("Эта локация ещё закрыта!");
+        } else {
+          alert("Локация пока не настроена.");
+        }
+      } else {
+        alert("Здесь будет особая локация/ивент.");
+      }
+    });
+
+    layer.appendChild(el);
+  });
+
+  showScreen("global-map-screen");
+}
+
+// чтобы работал onclick="showGlobalMap()" из index.html при type="module"
+window.showGlobalMap = showGlobalMap;
 
 // ========================= WORLD SCREEN ===========================
 
@@ -435,7 +640,7 @@ function showSkillPopup(text) {
   setTimeout(() => box.remove(), 1100);
 }
 
-// ========================= DRAG LOGIC ===========================
+// ========================= DRAG LOGIC (MATCH-3) ===========================
 
 function startDrag(x, y) {
   if (isProcessing || battleOver) return;
@@ -886,6 +1091,7 @@ function startBattle(loc, quest) {
 
 document.addEventListener("DOMContentLoaded", () => {
   setupInputListeners();
+  setupMapDragging();
 
   // skill buttons
   document.querySelectorAll(".skill-btn").forEach((btn) => {
